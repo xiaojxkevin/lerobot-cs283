@@ -17,16 +17,16 @@ This is a fork of [LeRobot](https://github.com/huggingface/lerobot) with added s
 ## Installation
 
 ```bash
-# Install LeRobot with required extras
-uv sync --locked --extra core_scripts --extra dynamixel
+uv pip install -e . -i http://mirrors.aliyun.com/pypi/simple/
 
 # Install xArm-Python-SDK manually (from UFACTORY source)
-pip install xarm-python-sdk
+uv pip install xarm-python-sdk
 
 # Install Intel RealSense SDK
-pip install pyrealsense2
+uv pip install pyrealsense2
 
 uv pip install 'lerobot[dataset]' -i http://mirrors.aliyun.com/pypi/simple/
+uv pip install 'lerobot[dynamixel]'
 ```
 
 ## Calibration
@@ -35,16 +35,18 @@ Calibrate both devices before first use. Run each command separately:
 
 ```bash
 # Calibrate the Gello leader arm
+# Saved to ~/.cache/huggingface/lerobot/calibration/teleoperators/gello_leader/test.json
 lerobot-calibrate \
   --teleop.type=gello_leader \
   --teleop.port=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U1QU-if00-port0 \
-  --teleop.id=main
+  --teleop.id=test
 
 # Calibrate the xArm6 follower
+# ~/.cache/huggingface/lerobot/calibration/robots/xarm_follower/test.json
 lerobot-calibrate \
   --robot.type=xarm_follower \
-  --robot.ip=192.168.1.212 \
-  --robot.id=main
+  --robot.ip=192.168.2.202 \
+  --robot.id=test
 ```
 
 Follow the on-screen instructions to move each arm through its range of motion.
@@ -57,8 +59,10 @@ Basic teleoperation (no cameras):
 lerobot-teleoperate \
   --teleop.type=gello_leader \
   --teleop.port=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U1QU-if00-port0 \
+  --teleop.id=main \
   --robot.type=xarm_follower \
-  --robot.ip=192.168.1.212
+  --robot.ip=192.168.2.202 \
+  --robot.id=main
 ```
 
 With cameras enabled:
@@ -67,11 +71,13 @@ With cameras enabled:
 lerobot-teleoperate \
   --teleop.type=gello_leader \
   --teleop.port=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U1QU-if00-port0 \
+  --teleop.id=main \
   --robot.type=xarm_follower \
-  --robot.ip=192.168.1.212 \
+  --robot.ip=192.168.2.202 \
+  --robot.id=main \
   --robot.cameras="{
-    \"cam_arm\": {\"type\": \"intelrealsense\", \"serial_number\": \"317622075882\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false},
-    \"cam_front\": {\"type\": \"intelrealsense\", \"serial_number\": \"231522072820\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false}
+    \"cam_arm\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": \"317622075882\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false},
+    \"cam_front\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": \"231522072820\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false}
   }" \
   --fps=30
 ```
@@ -84,41 +90,17 @@ Record a dataset by teleoperating the robot:
 lerobot-record \
   --teleop.type=gello_leader \
   --teleop.port=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U1QU-if00-port0 \
+  --teleop.id=main \
   --robot.type=xarm_follower \
-  --robot.ip=192.168.1.212 \
+  --robot.ip=192.168.2.202 \
+  --robot.id=main \
   --robot.cameras="{
-    \"cam_arm\": {
-      \"type\": \"intelrealsense\",
-      \"serial_number\": \"317622075882\",
-      \"fps\": 30,
-      \"width\": 640,
-      \"height\": 480,
-      \"use_depth\": false,
-      \"color_mode\": \"rgb\",
-      \"enable_auto_exposure\": true,
-      \"enable_auto_white_balance\": true,
-      \"contrast\": 50,
-      \"saturation\": 64,
-      \"sharpness\": 50
-    },
-    \"cam_front\": {
-      \"type\": \"intelrealsense\",
-      \"serial_number\": \"231522072820\",
-      \"fps\": 30,
-      \"width\": 640,
-      \"height\": 480,
-      \"use_depth\": false,
-      \"color_mode\": \"rgb\",
-      \"enable_auto_exposure\": true,
-      \"enable_auto_white_balance\": true,
-      \"contrast\": 50,
-      \"saturation\": 64,
-      \"sharpness\": 50
-    }
+    \"cam_arm\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": \"317622075882\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false, \"color_mode\": \"rgb\"},
+    \"cam_front\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": \"231522072820\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false, \"color_mode\": \"rgb\"}
   }" \
-  --dataset.repo_id=local/pick_place_img_v1 \
+  --dataset.repo_id=local/pick_and_place \
   --dataset.root=out \
-  --dataset.single_task="pick and place" \
+  --dataset.single_task="put kettle on stove" \
   --dataset.num_episodes=3 \
   --dataset.episode_time_s=300 \
   --dataset.reset_time_s=5 \
@@ -143,8 +125,9 @@ Replay a recorded episode on the xArm6:
 ```bash
 lerobot-replay \
   --robot.type=xarm_follower \
-  --robot.ip=192.168.1.212 \
-  --dataset.repo_id=local/pick_place_img_v1 \
+  --robot.ip=192.168.2.202 \
+  --robot.id=main \
+  --dataset.repo_id=local/pick_and_place \
   --dataset.root=out \
   --dataset.episode=0
 ```

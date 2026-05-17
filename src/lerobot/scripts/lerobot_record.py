@@ -449,6 +449,19 @@ def record(
         with VideoEncodingManager(dataset):
             recorded_episodes = 0
             while recorded_episodes < cfg.dataset.num_episodes and not events["stop_recording"]:
+                # Wait for SPACE to start recording
+                log_say("Press SPACE to start recording", cfg.play_sounds)
+                events["start_recording"] = False
+                events["exit_early"] = False
+                while (
+                    not events["start_recording"]
+                    and not events["stop_recording"]
+                ):
+                    time.sleep(0.1)
+
+                if events["stop_recording"]:
+                    break
+
                 log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
                 record_loop(
                     robot=robot,

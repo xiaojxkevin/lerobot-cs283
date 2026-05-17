@@ -112,7 +112,7 @@ class XarmFollower(Robot):
 
     @check_if_already_connected
     def connect(self, calibrate: bool = True) -> None:
-        require_package("xarm", extra="xarm")
+        require_package("xarm-python-sdk", extra="xarm", import_name="xarm")
         from xarm.wrapper import XArmAPI
 
         self.robot = XArmAPI(self.config.ip)

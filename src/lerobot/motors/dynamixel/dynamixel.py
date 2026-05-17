@@ -181,9 +181,15 @@ class DynamixelMotorsBus(SerialMotorsBus):
 
     def write_calibration(self, calibration_dict: dict[str, MotorCalibration], cache: bool = True) -> None:
         for motor, calibration in calibration_dict.items():
+            model = self._id_to_model(self.motors[motor].id)
+            max_res = self.model_resolution_table[model]
+            # Normalize to valid encoder range [0, max_res-1] to handle
+            # multi-turn wrap (negative Present_Position due to 32-bit signed decode).
+            range_min = calibration.range_min % max_res
+            range_max = calibration.range_max % max_res
             self.write("Homing_Offset", motor, calibration.homing_offset)
-            self.write("Min_Position_Limit", motor, calibration.range_min)
-            self.write("Max_Position_Limit", motor, calibration.range_max)
+            self.write("Min_Position_Limit", motor, range_min)
+            self.write("Max_Position_Limit", motor, range_max)
 
         if cache:
             self.calibration = calibration_dict

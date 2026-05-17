@@ -115,11 +115,13 @@ class GelloLeader(Teleoperator):
         range_mins[full_turn_motor] = 0
         range_maxes[full_turn_motor] = 4095
 
+        drive_modes = self.bus.sync_read("Drive_Mode", normalize=False)
+
         self.calibration = {}
         for motor, m in self.bus.motors.items():
             self.calibration[motor] = MotorCalibration(
                 id=m.id,
-                drive_mode=0,
+                drive_mode=int(drive_modes[motor]),
                 homing_offset=homing_offsets[motor],
                 range_min=range_mins[motor],
                 range_max=range_maxes[motor],

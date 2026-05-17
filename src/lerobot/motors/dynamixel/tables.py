@@ -104,6 +104,8 @@ X_SERIES_BAUDRATE_TABLE = {
 # {data_name: size_byte}
 X_SERIES_ENCODINGS_TABLE = {
     "Homing_Offset": X_SERIES_CONTROL_TABLE["Homing_Offset"][1],
+    "Min_Position_Limit": X_SERIES_CONTROL_TABLE["Min_Position_Limit"][1],
+    "Max_Position_Limit": X_SERIES_CONTROL_TABLE["Max_Position_Limit"][1],
     "Goal_PWM": X_SERIES_CONTROL_TABLE["Goal_PWM"][1],
     "Goal_Current": X_SERIES_CONTROL_TABLE["Goal_Current"][1],
     "Goal_Velocity": X_SERIES_CONTROL_TABLE["Goal_Velocity"][1],
