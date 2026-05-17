@@ -176,3 +176,7 @@ outputs/
 *.urdf
 *.xml
 *.part
+raw
+.claude
+.codex
+private

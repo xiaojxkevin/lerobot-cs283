@@ -130,12 +130,14 @@ from lerobot.robots import (  # noqa: F401
     reachy2,
     so_follower,
     unitree_g1 as unitree_g1_robot,
+    xarm_follower,
 )
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
     bi_openarm_leader,
     bi_so_leader,
+    gello_leader,
     homunculus,
     koch_leader,
     make_teleoperator_from_config,
