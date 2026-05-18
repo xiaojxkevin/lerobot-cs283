@@ -441,6 +441,25 @@ def record(
 
         listener, events = init_keyboard_listener()
 
+        # Initial warmup: sync xArm follower to Gello leader position.
+        # Teleoperation runs for cfg.dataset.warmup_time_s seconds without recording.
+        log_say(f"Warmup ({cfg.dataset.warmup_time_s}s): move xArm to starting position", cfg.play_sounds)
+        events["exit_early"] = False
+        record_loop(
+            robot=robot,
+            events=events,
+            fps=cfg.dataset.fps,
+            teleop_action_processor=teleop_action_processor,
+            robot_action_processor=robot_action_processor,
+            robot_observation_processor=robot_observation_processor,
+            teleop=teleop,
+            dataset=None,  # no recording during warmup
+            control_time_s=cfg.dataset.warmup_time_s,
+            single_task=cfg.dataset.single_task,
+            display_data=cfg.display_data,
+            display_compressed_images=display_compressed_images,
+        )
+
         if not cfg.dataset.streaming_encoding:
             logging.info(
                 "Streaming encoding is disabled. If you have capable hardware, consider enabling it for way faster episode saving. --dataset.streaming_encoding=true --dataset.encoder_threads=2 # --dataset.camera_encoder.vcodec=auto. More info in the documentation: https://huggingface.co/docs/lerobot/streaming_video_encoding"
@@ -453,6 +472,7 @@ def record(
                 log_say("Press SPACE to start recording", cfg.play_sounds)
                 events["start_recording"] = False
                 events["exit_early"] = False
+                events["stop_recording"] = False
                 while (
                     not events["start_recording"]
                     and not events["stop_recording"]

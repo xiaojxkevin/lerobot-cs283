@@ -18,6 +18,7 @@ from __future__ import annotations
 # Utilities
 ########################################################################################
 import logging
+import os
 import select
 import sys
 import termios
@@ -152,35 +153,41 @@ class TerminalKeyboardListener:
         fd = sys.stdin.fileno()
         old = termios.tcgetattr(fd)
         try:
-            tty.setcbreak(fd)
+            tty.setraw(fd)
             while self._running:
-                r, _, _ = select.select([sys.stdin], [], [], 0.1)
+                r, _, _ = select.select([fd], [], [], 0.1)
                 if not r:
                     continue
-                ch = sys.stdin.read(1)
-                if ch == " ":
-                    print("[Space] Start recording episode")
+                ch = os.read(fd, 1)
+                if ch == b" ":
+                    print("\r[Space] Start recording episode")
                     self._events["start_recording"] = True
-                elif ch == "\x1b":
-                    # Could be plain Esc or an arrow-key sequence `\x1b[...`
-                    r2, _, _ = select.select([sys.stdin], [], [], 0.02)
-                    if r2:
-                        seq = sys.stdin.read(2)
-                        if seq == "[C":
-                            print("[Right] Ending episode early...")
-                            self._events["exit_early"] = True
-                        elif seq == "[D":
-                            print("[Left] Re-recording episode...")
-                            self._events["rerecord_episode"] = True
-                            self._events["exit_early"] = True
-                    else:
-                        print("[Esc] Stopping recording...")
+                elif ch == b"\x1b":
+                    # Could be Esc or an arrow-key escape sequence.
+                    # Use a short timeout: locally the full sequence
+                    # arrives within a few ms.
+                    r2, _, _ = select.select([fd], [], [], 0.15)
+                    if not r2:
+                        print("\r[Esc] Stopping recording...")
                         self._events["stop_recording"] = True
+                        self._events["exit_early"] = True
+                        continue
+                    ch2 = os.read(fd, 1)
+                    if ch2 != b"[":
+                        continue
+                    r3, _, _ = select.select([fd], [], [], 0.15)
+                    if not r3:
+                        continue
+                    ch3 = os.read(fd, 1)
+                    if ch3 == b"C":
+                        print("\r[Right] Ending episode early...")
+                        self._events["exit_early"] = True
+                    elif ch3 == b"D":
+                        print("\r[Left] Re-recording episode...")
+                        self._events["rerecord_episode"] = True
                         self._events["exit_early"] = True
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
-        # Flush any remaining stdin
-        termios.tcflush(sys.stdin, termios.TCIFLUSH)
 
 
 def init_keyboard_listener():

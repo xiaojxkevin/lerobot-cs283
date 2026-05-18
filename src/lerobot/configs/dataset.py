@@ -35,6 +35,8 @@ class DatasetRecordConfig:
     episode_time_s: int | float = 60
     # Number of seconds for resetting the environment after each episode.
     reset_time_s: int | float = 60
+    # Number of seconds for initial warmup before the first episode (teleop without recording).
+    warmup_time_s: int | float = 5
     # Number of episodes to record.
     num_episodes: int = 50
     # Encode frames in the dataset into video

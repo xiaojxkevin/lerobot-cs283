@@ -25,8 +25,10 @@ uv pip install xarm-python-sdk
 # Install Intel RealSense SDK
 uv pip install pyrealsense2
 
+# For data collection
 uv pip install 'lerobot[dataset]' -i http://mirrors.aliyun.com/pypi/simple/
 uv pip install 'lerobot[dynamixel]'
+uv pip install rerun-sdk
 ```
 
 ## Calibration
@@ -87,6 +89,7 @@ lerobot-teleoperate \
 Record a dataset by teleoperating the robot:
 
 ```bash
+export DISPLAY=:1 &&
 lerobot-record \
   --teleop.type=gello_leader \
   --teleop.port=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U1QU-if00-port0 \
@@ -105,7 +108,7 @@ lerobot-record \
   --dataset.episode_time_s=300 \
   --dataset.reset_time_s=5 \
   --dataset.fps=30 \
-  --dataset.video=false \
+  --dataset.video=True \
   --dataset.push_to_hub=false
 ```
 
@@ -130,6 +133,16 @@ lerobot-replay \
   --dataset.repo_id=local/pick_and_place \
   --dataset.root=out \
   --dataset.episode=0
+```
+
+## Viz dataset
+
+```bash
+export DISPLAY=:1 &&
+lerobot-dataset-viz \
+  --repo-id pick_and_place \
+  --episode-index 0 \
+  --root ./out
 ```
 
 Change `--dataset.episode` to replay a different episode (e.g., `num_episodes - 1` for the last one).
