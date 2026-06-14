@@ -155,22 +155,32 @@ class XarmFollower(Robot):
                 return
 
         logger.info(f"\nRunning calibration of {self}")
-        print("Move the xArm6 to its zero position (all joints at 0 degrees, gripper closed) and press ENTER.")
+        print(
+            "\n⚠️  IMPORTANT: The xArm6 zero position should match the Gello leader's zero position.\n"
+            "Position the xArm6 so that each joint is at the center of its working range.\n"
+            "This will be the reference position where all teleoperation outputs are 0 degrees."
+        )
+        print("Position the xArm6 at its reference/zero position and press ENTER.")
         input()
         code, zero_angles = self.robot.get_servo_angle()
         code, zero_gripper = self.robot.get_gripper_position()
         zero_positions = list(zero_angles)
-        zero_positions[-1] = zero_gripper
 
-        print("Now move each joint through its full range of motion to record limits.")
-        print("Press ENTER when done.")
+        print(
+            "\nNow open the gripper fully, then move it to fully closed, to record its range.\n"
+            "Press ENTER when done."
+        )
         input()
 
         code, end_angles = self.robot.get_servo_angle()
         code, end_gripper = self.robot.get_gripper_position()
 
         # Build calibration: for DEGREE joints, homing_offset = -zero_position
-        # For LINEAR gripper, store start/end range
+        #   _apply_calibration:  normalized = raw + homing_offset  → zero point maps to 0°
+        #   _revert_calibration: raw = normalized - homing_offset   → 0° maps to zero point
+        # For LINEAR gripper, store start (open) / end (closed) range
+        #   _apply_calibration:  normalized = (raw - start) / (end - start) * 100 → [0,100]%
+        #   _revert_calibration: raw = normalized/100 * (end-start) + start
         self.calibration = {
             "motor_names": list(MOTOR_NAMES),
             "calib_mode": ["DEGREE"] * 6 + ["LINEAR"],
@@ -181,14 +191,33 @@ class XarmFollower(Robot):
                 float(-zero_positions[3]),
                 float(-zero_positions[4]),
                 float(-zero_positions[5]),
-                0.0,
+                0.0,  # gripper uses LINEAR mode, homing_offset not used
             ],
             "drive_mode": [0] * 7,
-            "start_pos": [0.0] * 6 + [float(zero_gripper)],
-            "end_pos": [0.0] * 6 + [float(end_gripper)],
+            "start_pos": [0.0] * 6 + [float(zero_gripper)],  # gripper open position
+            "end_pos": [0.0] * 6 + [float(end_gripper)],      # gripper closed position
         }
+
+        # Validate: warn if gripper open/closed look suspicious
+        if zero_gripper <= end_gripper:
+            logger.warning(
+                f"Gripper start_pos={zero_gripper} <= end_pos={end_gripper}. "
+                f"Expected start (open) > end (closed). Gripper range may be inverted."
+            )
+
         self._save_calibration()
-        print(f"Calibration saved to {self.calibration_fpath}")
+
+        print(f"\nCalibration saved to {self.calibration_fpath}")
+        print(f"{'Joint':<10} | {'homing_offset (°)':>16} | {'gripper_open':>13} | {'gripper_close':>14}")
+        print("-" * 60)
+        for i, name in enumerate(MOTOR_NAMES):
+            ho = self.calibration["homing_offset"][i]
+            if i < 6:
+                print(f"{name:<10} | {ho:>16.1f} | {'—':>13} | {'—':>14}")
+            else:
+                so = self.calibration["start_pos"][i]
+                sc = self.calibration["end_pos"][i]
+                print(f"{name:<10} | {'—':>16} | {so:>13.1f} | {sc:>14.1f}")
 
     def _load_calibration(self, fpath: Path | None = None) -> None:
         fpath = self.calibration_fpath if fpath is None else fpath
@@ -280,7 +309,11 @@ class XarmFollower(Robot):
         raw_values = np.array(list(servo_angle) + [gripper_pos], dtype=np.float64)
 
         if self.calibration:
-            raw_values = self._apply_calibration(raw_values)
+            try:
+                raw_values = self._apply_calibration(raw_values)
+            except JointOutOfRangeError as e:
+                logger.warning(f"Observation calibration check failed: {e}")
+                # Return raw values un-calibrated so teleop can start
 
         obs_dict = {f"{name}.pos": float(raw_values[i]) for i, name in enumerate(MOTOR_NAMES)}
         dt_ms = (time.perf_counter() - start) * 1e3
@@ -339,7 +372,13 @@ class XarmFollower(Robot):
 
         # Return the action actually sent (normalized)
         if self.calibration:
-            normalized = self._apply_calibration(raw_values.copy())
+            try:
+                normalized = self._apply_calibration(raw_values.copy())
+            except JointOutOfRangeError as e:
+                logger.warning(f"Action sent but calibration check failed: {e}")
+                # Return the input action as-is so teleop can continue
+                return {f"{name}.pos": float(action.get(f"{name}.pos", 0.0))
+                        for i, name in enumerate(MOTOR_NAMES)}
             return {f"{name}.pos": float(normalized[i]) for i, name in enumerate(MOTOR_NAMES)}
         return {f"{name}.pos": float(raw_values[i]) for i, name in enumerate(MOTOR_NAMES)}
 

@@ -868,9 +868,21 @@ class SerialMotorsBus(MotorsBusBase):
                 norm = ((bounded_val - min_) / (max_ - min_)) * 100
                 normalized_values[id_] = 100 - norm if drive_mode else norm
             elif self.motors[motor].norm_mode is MotorNormMode.DEGREES:
-                mid = (min_ + max_) / 2
-                max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
-                normalized_values[id_] = (val - mid) * 360 / max_res
+                resolution = self.model_resolution_table[self._id_to_model(id_)]
+                full_turn = resolution - 1
+                half = resolution // 2
+
+                if min_ > max_:
+                    # Wrapped range: the joint's physical range crosses the 0/resolution boundary.
+                    # Range is [min_, resolution-1] ∪ [0, max_] in the forward direction.
+                    span = resolution - min_ + max_ + 1
+                    mid = int(round((min_ + span / 2.0) % resolution))
+                else:
+                    mid = int(round((min_ + max_) / 2.0))
+
+                # Circular signed distance: handles wrap-around at the encoder boundary.
+                diff = (val - mid + half) % resolution - half
+                normalized_values[id_] = diff * 360.0 / full_turn
             else:
                 raise NotImplementedError
 
@@ -898,9 +910,19 @@ class SerialMotorsBus(MotorsBusBase):
                 bounded_val = min(100.0, max(0.0, val))
                 unnormalized_values[id_] = int((bounded_val / 100) * (max_ - min_) + min_)
             elif self.motors[motor].norm_mode is MotorNormMode.DEGREES:
-                mid = (min_ + max_) / 2
-                max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
-                unnormalized_values[id_] = int((val * max_res / 360) + mid)
+                resolution = self.model_resolution_table[self._id_to_model(id_)]
+                full_turn = resolution - 1
+                half = resolution // 2
+
+                if min_ > max_:
+                    span = resolution - min_ + max_ + 1
+                    mid = int(round((min_ + span / 2.0) % resolution))
+                else:
+                    mid = int(round((min_ + max_) / 2.0))
+
+                # Inverse of circular signed distance.
+                ticks = int(round(val * full_turn / 360.0))
+                unnormalized_values[id_] = (mid + ticks) % resolution
             else:
                 raise NotImplementedError
 

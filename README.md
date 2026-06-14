@@ -51,6 +51,13 @@ lerobot-calibrate \
   --robot.id=test
 ```
 
+```
+Gello raw (12-bit encoder + homing_offset)
+  → Gello DEGREES normalization: (raw - range_mid) * 360 / 4095  → output degrees
+    → Identity processor (1:1)
+      → xArm revert: raw_xarm = degrees - xarm_homing_offset  → send to xArm
+```
+
 Follow the on-screen instructions to move each arm through its range of motion.
 
 ## Teleoperate
@@ -89,6 +96,7 @@ lerobot-teleoperate \
 Record a dataset by teleoperating the robot:
 
 ```bash
+rm -rf out &&
 export DISPLAY=:1 &&
 lerobot-record \
   --teleop.type=gello_leader \
@@ -109,6 +117,8 @@ lerobot-record \
   --dataset.reset_time_s=5 \
   --dataset.fps=30 \
   --dataset.video=True \
+  --dataset.streaming_encoding=true \
+  --dataset.encoder_threads=8 \
   --dataset.push_to_hub=false
 ```
 

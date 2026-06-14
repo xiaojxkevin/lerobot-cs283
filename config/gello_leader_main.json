@@ -2,50 +2,50 @@
     "j1": {
         "id": 1,
         "drive_mode": 0,
-        "homing_offset": -2048,
-        "range_min": 0,
-        "range_max": 4095
+        "homing_offset": 23,
+        "range_min": 1111,
+        "range_max": 3088
     },
     "j2": {
         "id": 2,
         "drive_mode": 0,
-        "homing_offset": -2048,
-        "range_min": 0,
-        "range_max": 4095
+        "homing_offset": -298,
+        "range_min": 1105,
+        "range_max": 2561
     },
     "j3": {
         "id": 3,
         "drive_mode": 0,
-        "homing_offset": -2048,
-        "range_min": 0,
-        "range_max": 4095
+        "homing_offset": 149,
+        "range_min": 1500,
+        "range_max": 2675
     },
     "j4": {
         "id": 4,
         "drive_mode": 0,
-        "homing_offset": -2048,
-        "range_min": 0,
-        "range_max": 4095
+        "homing_offset": 0,
+        "range_min": 3000,
+        "range_max": 904
     },
     "j5": {
         "id": 5,
         "drive_mode": 0,
-        "homing_offset": -2048,
-        "range_min": 0,
-        "range_max": 4095
+        "homing_offset": 0,
+        "range_min": 4000,
+        "range_max": 1104
     },
     "j6": {
         "id": 6,
         "drive_mode": 0,
         "homing_offset": 0,
-        "range_min": 0,
-        "range_max": 4095
+        "range_min": 3000,
+        "range_max": 904
     },
     "gripper": {
         "id": 7,
         "drive_mode": 1,
-        "homing_offset": -1683,
-        "range_min": 3713,
-        "range_max": 4481
+        "homing_offset": -1679,
+        "range_min": 3699,
+        "range_max": 4454
     }
 }

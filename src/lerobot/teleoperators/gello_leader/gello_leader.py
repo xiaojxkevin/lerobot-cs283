@@ -102,18 +102,32 @@ class GelloLeader(Teleoperator):
         for motor in self.bus.motors:
             self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
 
-        input(f"Move {self} to the middle of its range of motion and press ENTER....")
+        print(
+            "\n⚠️  IMPORTANT: For each joint, move it to its MECHANICAL MID-POINT "
+            "(center of its physical range of motion), not to an extreme.\n"
+            "The homing offset will set this position as 0 degrees."
+        )
+        input(f"Move {self} so each joint is at its mechanical mid-point, then press ENTER...")
         homing_offsets = self.bus.set_half_turn_homings()
 
-        full_turn_motor = "j6"
-        unknown_range_motors = [motor for motor in self.bus.motors if motor != full_turn_motor]
+        # Validate homing offsets — warn if any joint appears to be at an extreme
+        max_res = 4095
+        half_turn = max_res // 2  # 2047
+        extreme_threshold = half_turn // 2  # ~1023 — offset larger than this is suspicious
+        for motor, offset in homing_offsets.items():
+            if abs(offset) > extreme_threshold:
+                logger.warning(
+                    f"Motor '{motor}' has homing_offset={offset}. "
+                    f"This means the encoder was at ~{half_turn - offset} during homing, "
+                    f"which is near an extreme (not mid-range). "
+                    f"Consider re-running calibration with the joint at its mechanical center."
+                )
+
         print(
-            f"Move all joints except '{full_turn_motor}' sequentially through their "
+            "\nNow move ALL joints sequentially through their "
             "entire ranges of motion.\nRecording positions. Press ENTER to stop..."
         )
-        range_mins, range_maxes = self.bus.record_ranges_of_motion(unknown_range_motors)
-        range_mins[full_turn_motor] = 0
-        range_maxes[full_turn_motor] = 4095
+        range_mins, range_maxes = self.bus.record_ranges_of_motion()
 
         drive_modes = self.bus.sync_read("Drive_Mode", normalize=False)
 
@@ -129,7 +143,14 @@ class GelloLeader(Teleoperator):
 
         self.bus.write_calibration(self.calibration)
         self._save_calibration()
-        print(f"Calibration saved to {self.calibration_fpath}")
+
+        # Print calibration summary for verification
+        print(f"\nCalibration saved to {self.calibration_fpath}")
+        print(f"{'Motor':<10} | {'homing_offset':>14} | {'range_min':>10} | {'range_max':>10}")
+        print("-" * 52)
+        for motor in self.bus.motors:
+            c = self.calibration[motor]
+            print(f"{motor:<10} | {c.homing_offset:>14} | {c.range_min:>10} | {c.range_max:>10}")
 
     def configure(self) -> None:
         self.bus.disable_torque()
@@ -157,6 +178,12 @@ class GelloLeader(Teleoperator):
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         return action
+
+    @check_if_not_connected
+    def get_raw_action(self) -> dict[str, float]:
+        """Read raw Present_Position values without normalization (for debugging)."""
+        raw = self.bus.sync_read("Present_Position", normalize=False)
+        return {f"{motor}.raw": float(val) for motor, val in raw.items()}
 
     @check_if_not_connected
     def send_feedback(self, feedback: dict[str, float]) -> None:
