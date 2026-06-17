@@ -60,6 +60,39 @@ from .robot_wrapper import ThreadSafeRobot
 logger = logging.getLogger(__name__)
 
 
+def _interpolate_to_position(robot, target: dict[str, float], duration_s: float = 3.0, fps: int = 50) -> None:
+    """Smoothly interpolate the robot from its current position to *target*.
+
+    Args:
+        robot: A connected robot instance (must have ``send_action``).
+        target: Dict of ``{name.pos: value, ...}`` — all keys must end with ``.pos``.
+        duration_s: Total interpolation time in seconds.
+        fps: Interpolation update rate.
+    """
+    import time
+
+    current_obs = robot.get_observation()
+    current_pos = {k: v for k, v in current_obs.items() if k.endswith(".pos")}
+
+    # Validate: all target keys must be known motor keys
+    unknown = set(target.keys()) - set(current_pos.keys())
+    if unknown:
+        raise ValueError(
+            f"start_position contains unknown motor keys: {sorted(unknown)}. "
+            f"Known keys: {sorted(current_pos.keys())}"
+        )
+
+    steps = max(int(duration_s * fps), 1)
+    for step in range(1, steps + 1):
+        t = step / steps
+        interp = {}
+        for k in current_pos:
+            interp[k] = current_pos[k] * (1 - t) + target.get(k, current_pos[k]) * t
+        robot.send_action(interp)
+        time.sleep(1 / fps)
+    logger.info("Interpolation to start position complete (%d steps over %.1fs)", steps, duration_s)
+
+
 def _resolve_action_key_order(
     policy_action_names: list[str] | None, dataset_action_names: list[str]
 ) -> list[str]:
@@ -242,6 +275,30 @@ def build_rollout_context(
     initial_obs = robot.get_observation()
     initial_position = {k: v for k, v in initial_obs.items() if k.endswith(".pos")}
     logger.info("Captured initial robot position (%d keys)", len(initial_position))
+
+    # --- 3a. Optionally move to a start position before rollout ---
+    if cfg.start_position is not None:
+        start_pos = cfg.start_position
+        if isinstance(start_pos, str):
+            # Treat as a JSON file path
+            import json
+
+            with open(start_pos) as f:
+                start_pos = json.load(f)
+
+        # Convert raw hardware readings → normalized / calibrated joint space
+        # so the user can copy values directly from xArm Studio.
+        if cfg.start_position_in_raw and hasattr(robot, "apply_calibration"):
+            start_pos = robot.apply_calibration(start_pos)
+            logger.info("Converted start_position from raw → calibrated space: %s", start_pos)
+
+        logger.info("Moving robot to start position: %s", start_pos)
+        _interpolate_to_position(robot, start_pos, duration_s=cfg.start_position_duration, fps=50)
+        # After moving, re-capture as the new "initial" position so shutdown
+        # returns here (not to the pre-move pose the user happened to connect at).
+        initial_obs = robot.get_observation()
+        initial_position = {k: v for k, v in initial_obs.items() if k.endswith(".pos")}
+        logger.info("Robot at start position — updated initial position")
 
     robot_wrapper = ThreadSafeRobot(robot)
 

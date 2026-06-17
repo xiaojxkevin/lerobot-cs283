@@ -118,7 +118,7 @@ lerobot-record \
   --dataset.fps=30 \
   --dataset.video=True \
   --dataset.streaming_encoding=true \
-  --dataset.encoder_threads=8 \
+  --dataset.encoder_threads=16 \
   --dataset.push_to_hub=false
 ```
 
@@ -180,43 +180,66 @@ lerobot-train \
   --save_freq=200
 ```
 
-### ACT with history frames (`n_obs_steps > 1`)
+## Deployment
 
-When `n_obs_steps > 1`, the model receives the last N frames with spatio-temporal position encodings, giving it temporal context for better action prediction:
+Policy deployment uses `lerobot-rollout`. The policy type (`act`) is auto-detected from the checkpoint —
+no need to specify `--policy.type` on the CLI.
+
+### How it works
+
+| Component | Detail |
+|---|---|
+| Inference | **Synchronous** (`--inference.type=sync`, default). Each control tick runs preprocessor → policy → postprocessor inline, then sends the action to the robot. |
+| Temporal ensembling | **Inference-time only** — no retraining needed. Every step queries the policy for a new `chunk_size=100` action chunk, then fuses it with previous chunks via exponentially-weighted averaging (coeff = `0.01`, per the original ACT paper). This produces fully closed-loop control at ~9ms latency, well within the ~33ms budget at 30 FPS. |
+| `n_action_steps=1` | Required by the temporal ensembler: `update()` pops 1 fused action per call, so the control loop must query every step. The model still predicts 100-step chunks every time — the ensemble fuses overlapping predictions for the same future timestep. |
+| Action space | **Absolute joint positions** (7 DoF: j1–j6 degrees + gripper 0–100%). |
+| Start position | Robot interpolates from its current pose to `--start_position` before the control loop begins. On shutdown, `--return_to_initial_position=true` (default) smoothly returns to this same pose. **Values are in raw hardware space** (as shown in xArm Studio) — the robot's calibration is applied internally to convert to the normalized joint space that the policy expects. |
+| Multi-episode | `--num_rollouts=N` runs N episodes back-to-back. Between episodes the robot returns to `--start_position` and the policy is reset so every episode starts from a consistent state. |
+
+### Rollout Controls
+
+| Key | Action |
+|---|---|
+| **Space** | Start the next episode (after homing to start position) |
+| **Right Arrow** | End current episode early → return to start → wait for Space |
+| **Esc** | Stop rollout entirely |
+
+### Run
 
 ```bash
-lerobot-train \
-  --policy.type=act \
-  --policy.push_to_hub=false \
-  --policy.n_obs_steps=2 \
-  --policy.chunk_size=100 \
-  --policy.image_resize_size="[256, 320]" \
-  --dataset.repo_id=local/pick_place \
-  --dataset.root=./data/0430 \
-  --batch_size=16 \
-  --steps=20000 \
-  --num_workers=16 \
-  --save_freq=2000
+uv run lerobot-rollout \
+  --strategy.type=base \
+  --policy.path=checkpoints/original/120000/pretrained_model \
+  --policy.temporal_ensemble_coeff=0.01 \
+  --policy.n_action_steps=1 \
+  --robot.type=xarm_follower \
+  --robot.ip=192.168.2.202 \
+  --robot.id=main \
+  --robot.cameras="{
+    \"cam_arm\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": \"317622075882\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false},
+    \"cam_front\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": \"231522072820\", \"fps\": 30, \"width\": 640, \"height\": 480, \"use_depth\": false}
+  }" \
+  --start_position='{"j1.pos": -1.4, "j2.pos": 15.4, "j3.pos": -84.1, "j4.pos": -2.1, "j5.pos": 75.7, "j6.pos": 19.0, "gripper.pos": 400.0}' \
+  --start_position_duration=3.0 \
+  --fps=30 \
+  --duration=30 \
+  --num_rollouts=40
 ```
 
-Set `--policy.n_obs_steps` to the desired number of history frames (e.g. 2, 3, 5). Higher values use more GPU memory since image token count scales as `n_obs_steps × H × W`.
+### Key parameters
 
-### Key ACT parameters
-
-| Parameter | Default | Description |
-|---|---|---|
-| `--policy.n_obs_steps` | `1` | History-frame toggle. `1` = single frame, `>1` = temporal history |
-| `--policy.image_resize_size` | `None` | (H, W) to resize images before the backbone, e.g. `[256, 320]`. `None` = native 480×640 |
-| `--policy.chunk_size` | `100` | Number of actions predicted per forward pass |
-| `--policy.n_action_steps` | `100` | How many predicted actions to execute before re-querying |
-| `--policy.dim_model` | `512` | Transformer hidden dimension |
-| `--policy.n_encoder_layers` | `4` | Transformer encoder depth |
-| `--policy.n_decoder_layers` | `1` | Transformer decoder depth |
-| `--policy.use_vae` | `true` | Enable VAE for temporal smoothness; disable with `false` for speed |
-| `--policy.kl_weight` | `10.0` | Weight for KL-divergence loss term |
-| `--policy.optimizer_lr` | `1e-5` | Learning rate (transformer + action head) |
-| `--policy.optimizer_lr_backbone` | `1e-5` | Learning rate for the vision backbone |
-
-## Upstream
-
-Built on [LeRobot](https://github.com/huggingface/lerobot) — an open-source library for end-to-end robot learning. See the [upstream documentation](https://huggingface.co/docs/lerobot/index) for policies, environments, and more.
+| Parameter | Description |
+|---|---|
+| `--policy.path` | Path to `pretrained_model/` directory |
+| `--policy.temporal_ensemble_coeff` | `0.01` = standard ACT temporal ensembling (override from checkpoint `null`) |
+| `--policy.n_action_steps` | Must be `1` with temporal ensembling (override from checkpoint `100`) |
+| `--strategy.type` | `base` = inference only; `sentry` = inference + recording; `dagger` = human-in-the-loop |
+| `--robot.ip` | xArm6 controller IP |
+| `--robot.cameras` | Camera config dict (type, serial, resolution) |
+| `--start_position` | Raw hardware values (copy from xArm Studio). Dict `{"j1.pos": raw_angle, ...}` or JSON file path |
+| `--start_position_duration` | Seconds for the interpolation (default 3.0) |
+| `--start_position_in_raw` | `true` (default) = values are raw hardware readings; auto-converted via calibration |
+| `--fps` | Control loop frequency (match training data: 30) |
+| `--duration` | Seconds per episode (`0` = infinite, until Ctrl+C or Right Arrow) |
+| `--num_rollouts` | Number of episodes to run sequentially (default 1). Robot returns to start_position between episodes |
+| `--display_data` | `true` to enable Rerun visualization |
