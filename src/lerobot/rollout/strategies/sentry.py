@@ -18,20 +18,37 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
+import sys
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event, Lock
 
+from lerobot.common.control_utils import is_headless
 from lerobot.datasets import VideoEncodingManager
 from lerobot.datasets.utils import DEFAULT_VIDEO_FILE_SIZE_IN_MB
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame
+from lerobot.utils.import_utils import _pynput_available
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.utils import log_say
 
 from ..configs import SentryStrategyConfig
 from ..context import RolloutContext
 from .core import RolloutStrategy, estimate_max_episode_seconds, safe_push_to_hub, send_next_action
+
+PYNPUT_AVAILABLE = _pynput_available
+keyboard = None
+if PYNPUT_AVAILABLE:
+    try:
+        if ("DISPLAY" not in os.environ) and ("linux" in sys.platform):
+            logging.info("No DISPLAY set. Skipping pynput import.")
+            PYNPUT_AVAILABLE = False
+        else:
+            from pynput import keyboard
+    except Exception as e:
+        PYNPUT_AVAILABLE = False
+        logging.info(f"Could not import pynput: {e}")
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +66,19 @@ class SentryStrategy(RolloutStrategy):
     so no push is ever silently dropped and exactly one push runs at a
     time.
 
-    Policy state (hidden state, RTC queue) intentionally persists across
-    episode boundaries — Sentry slices one continuous rollout, the robot
-    does not reset between slices.
+    Policy state (hidden state, RTC queue) is reset between ``--num_rollouts``
+    episodes so each episode starts from a consistent state.
 
     Requires ``streaming_encoding=True`` (enforced in config validation)
     to prevent disk I/O from blocking the control loop.
+
+    Multi-episode flow (``--num_rollouts=N``)::
+
+        Return to start_position  →  wait for Space  →  record episode (auto-rotate)
+          ↑                                                                    │
+          └──────────────── Right Arrow ends episode ─────────────────────────┘
+
+    Press **Esc** at any time to abort the entire session.
     """
 
     config: SentryStrategyConfig
@@ -65,14 +89,66 @@ class SentryStrategy(RolloutStrategy):
         self._pending_push: Future | None = None
         self._needs_push = Event()
         self._episode_lock = Lock()
+        self._listener = None
+        self._episode_end_event = Event()
+        self._episode_start_event = Event()
+
+    # ------------------------------------------------------------------
+    # Keyboard listener
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _start_keyboard_listener(
+        episode_start_event: Event,
+        episode_end_event: Event,
+        shutdown_event: Event,
+    ):
+        """Start a pynput listener.
+
+        ==============  ===========================================
+        Key              Action
+        ==============  ===========================================
+        **Space**        Start the next episode (when waiting).
+        **Right Arrow**  End the current episode early.
+        **Esc**          Full shutdown.
+        ==============  ===========================================
+        """
+        if not PYNPUT_AVAILABLE or is_headless():
+            logger.warning("Headless environment or pynput unavailable — keyboard controls disabled")
+            return None
+
+        def on_press(key):
+            try:
+                if key == keyboard.Key.space:
+                    episode_start_event.set()
+                elif key == keyboard.Key.right:
+                    logger.info("Right Arrow pressed — ending current episode")
+                    episode_end_event.set()
+                elif key == keyboard.Key.esc:
+                    logger.info("Esc pressed — requesting full shutdown")
+                    shutdown_event.set()
+            except Exception:
+                pass
+
+        listener = keyboard.Listener(on_press=on_press)
+        listener.start()
+        logger.info("Keyboard listener started (Space = start, Right Arrow = end, Esc = stop)")
+        return listener
+
+    # ------------------------------------------------------------------
+    # Strategy lifecycle
+    # ------------------------------------------------------------------
 
     def setup(self, ctx: RolloutContext) -> None:
-        """Initialise the inference engine and background push executor."""
+        """Initialise the inference engine, push executor, and keyboard listener."""
         self._init_engine(ctx)
         self._push_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sentry-push")
         target_mb = self.config.target_video_file_size_mb or DEFAULT_VIDEO_FILE_SIZE_IN_MB
         self._episode_duration_s = estimate_max_episode_seconds(
             ctx.data.dataset_features, ctx.runtime.cfg.fps, target_size_mb=target_mb
+        )
+        self._listener = self._start_keyboard_listener(
+            self._episode_start_event, self._episode_end_event, ctx.runtime.shutdown_event
         )
         logger.info(
             "Sentry strategy ready (episode_duration=%.0fs, upload_every=%d eps)",
@@ -81,7 +157,68 @@ class SentryStrategy(RolloutStrategy):
         )
 
     def run(self, ctx: RolloutContext) -> None:
-        """Run the continuous recording loop with automatic episode rotation."""
+        """Run autonomous recording episodes until shutdown or ``num_rollouts``
+        is exhausted.
+        """
+        cfg = ctx.runtime.cfg
+        num_episodes = max(cfg.num_rollouts, 1)
+        episode = 0
+
+        while episode < num_episodes and not ctx.runtime.shutdown_event.is_set():
+            episode += 1
+            self._episode_end_event.clear()
+
+            # Return to start position before every episode.
+            if ctx.hardware.initial_position:
+                if num_episodes > 1:
+                    logger.info("Returning to start position (episode %d / %d)...", episode, num_episodes)
+                try:
+                    self._return_to_initial_position(
+                        ctx.hardware, duration_s=cfg.start_position_duration
+                    )
+                except Exception as e:
+                    logger.warning("Failed to return to start position: %s", e)
+
+            if ctx.runtime.shutdown_event.is_set():
+                break
+
+            # Wait for Space before starting.
+            logger.info("=== Episode %d / %d — press Space to start ===", episode, num_episodes)
+            self._wait_for_space(ctx.runtime.shutdown_event)
+            if ctx.runtime.shutdown_event.is_set():
+                break
+
+            # Reset and run.
+            self._engine.reset()
+            self._interpolator.reset()
+            self._engine.resume()
+
+            self._run_single_episode(ctx)
+
+            self._engine.pause()
+
+            if self._episode_end_event.is_set():
+                logger.info("Episode %d ended by user", episode)
+
+        logger.info("All %d episode(s) complete", num_episodes)
+
+    def _wait_for_space(self, shutdown_event: Event) -> None:
+        """Block until Space (start episode) or Esc (shutdown) is pressed."""
+        self._episode_start_event.clear()
+        while not self._episode_start_event.is_set() and not shutdown_event.is_set():
+            time.sleep(0.1)
+
+    # ------------------------------------------------------------------
+    # Single-episode recording loop
+    # ------------------------------------------------------------------
+
+    def _run_single_episode(self, ctx: RolloutContext) -> None:
+        """Run the continuous recording loop for one episode with automatic
+        episode rotation based on video file size.
+
+        Exits when *duration* expires, *shutdown_event* is set, or
+        *episode_end_event* is set (Right Arrow).
+        """
         engine = self._engine
         cfg = ctx.runtime.cfg
         robot = ctx.hardware.robot_wrapper
@@ -91,7 +228,6 @@ class SentryStrategy(RolloutStrategy):
 
         control_interval = interpolator.get_control_interval(cfg.fps)
 
-        engine.resume()
         play_sounds = cfg.play_sounds
         episode_duration_s = self._episode_duration_s
 
@@ -103,7 +239,7 @@ class SentryStrategy(RolloutStrategy):
 
         with VideoEncodingManager(dataset):
             try:
-                while not ctx.runtime.shutdown_event.is_set():
+                while not ctx.runtime.shutdown_event.is_set() and not self._episode_end_event.is_set():
                     loop_start = time.perf_counter()
 
                     if cfg.duration > 0 and (time.perf_counter() - start_time) >= cfg.duration:
@@ -161,11 +297,14 @@ class SentryStrategy(RolloutStrategy):
                         precise_sleep(sleep_t)
                     else:
                         logger.warning(
-                            f"Record loop is running slower ({1 / dt:.1f} Hz) than the target FPS ({cfg.fps} Hz). Dataset frames might be dropped and robot control might be unstable. Common causes are: 1) Camera FPS not keeping up 2) Policy inference taking too long 3) CPU starvation"
+                            f"Control loop is running slower ({1 / dt:.1f} Hz) than "
+                            f"the target FPS ({cfg.fps} Hz). Robot control may be "
+                            f"unstable. Common causes: 1) Camera FPS not keeping up "
+                            f"2) Policy inference taking too long 3) CPU starvation"
                         )
 
             finally:
-                logger.info("Sentry control loop ended — saving final episode")
+                logger.info("Sentry recording paused — saving final episode")
                 with contextlib.suppress(Exception):
                     with self._episode_lock:
                         dataset.save_episode()
@@ -176,6 +315,10 @@ class SentryStrategy(RolloutStrategy):
         play_sounds = ctx.runtime.cfg.play_sounds
         logger.info("Stopping sentry recording")
         log_say("Stopping sentry recording", play_sounds)
+
+        if self._listener is not None:
+            logger.info("Stopping keyboard listener")
+            self._listener.stop()
 
         # Flush any queued/running push cleanly.
         if self._push_executor is not None:
