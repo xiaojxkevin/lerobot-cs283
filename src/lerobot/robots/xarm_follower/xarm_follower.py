@@ -273,6 +273,39 @@ class XarmFollower(Robot):
 
         return values
 
+    def apply_calibration(self, raw_positions: dict[str, float]) -> dict[str, float]:
+        """Convert raw hardware readings to normalized joint space (public wrapper).
+
+        Accepts a dict like ``{"j1.pos": raw_servo_angle, ...}`` as read from
+        xArm Studio / ``get_servo_angle()`` and returns normalized / calibrated
+        values that are directly comparable to policy inputs / dataset actions.
+
+        This is the inverse of the conversion that ``send_action`` applies
+        internally via ``_revert_calibration``.
+        """
+        raw_array = np.array(
+            [raw_positions.get(f"{name}.pos", 0.0) for name in MOTOR_NAMES],
+            dtype=np.float64,
+        )
+        normalized = self._apply_calibration(raw_array)
+        return {f"{name}.pos": float(normalized[i]) for i, name in enumerate(MOTOR_NAMES)}
+
+    def settle_gripper_to(self, normalized_position: float, timeout: float = 3.0) -> None:
+        """Move the gripper to *normalized_position* (0=open … 100=closed) and
+        block until the xArm reports it has arrived, or *timeout* expires.
+        """
+        dummy = np.zeros(len(MOTOR_NAMES), dtype=np.float64)
+        dummy[6] = normalized_position
+        raw_all = self._revert_calibration(dummy)
+        target_raw = float(raw_all[6])
+        self.robot.set_gripper_position(int(target_raw), wait=False)
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < timeout:
+            _, pos = self.robot.get_gripper_position()
+            if abs(pos - target_raw) <= 10:
+                return
+            time.sleep(0.1)
+
     def _revert_calibration(self, values: np.ndarray) -> np.ndarray:
         """Inverse of `_apply_calibration` — convert normalized values back to raw xArm values."""
         values = values.astype(np.float64)
