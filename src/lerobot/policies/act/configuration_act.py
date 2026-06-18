@@ -145,10 +145,8 @@ class ACTConfig(PreTrainedConfig):
                 f"The chunk size is the upper bound for the number of action steps per model invocation. Got "
                 f"{self.n_action_steps} for `n_action_steps` and {self.chunk_size} for `chunk_size`."
             )
-        if self.n_obs_steps != 1:
-            raise ValueError(
-                f"Multiple observation steps not handled yet. Got `nobs_steps={self.n_obs_steps}`"
-            )
+        if self.n_obs_steps < 1:
+            raise ValueError(f"`n_obs_steps` must be >= 1. Got `n_obs_steps={self.n_obs_steps}`.")
 
     def get_optimizer_preset(self) -> AdamWConfig:
         return AdamWConfig(
@@ -164,7 +162,12 @@ class ACTConfig(PreTrainedConfig):
             raise ValueError("You must provide at least one image or the environment state among the inputs.")
 
     @property
-    def observation_delta_indices(self) -> None:
+    def observation_delta_indices(self) -> list | None:
+        # For a single observation step keep the legacy behaviour (return None so the dataset delivers only
+        # the current frame, with no time axis). For history, request the current frame plus the previous
+        # `n_obs_steps - 1` frames, e.g. n_obs_steps=2 -> [-1, 0].
+        if self.n_obs_steps > 1:
+            return list(range(1 - self.n_obs_steps, 1))
         return None
 
     @property

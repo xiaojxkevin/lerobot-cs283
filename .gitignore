@@ -181,3 +181,6 @@ raw
 .codex
 private
 out
+scripts/sim_deploy/assets/
+scripts/sim_deploy/actions_ep0.npz
+dataset/
