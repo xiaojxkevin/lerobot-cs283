@@ -193,6 +193,11 @@ class RolloutConfig:
     # Runtime
     fps: float = 30.0
     duration: float = 0.0  # 0 = infinite (24/7 mode)
+    # Number of rollout episodes to run sequentially.  Between episodes the
+    # robot returns to ``start_position`` and the policy is reset so each
+    # episode starts from a consistent state.  Press Right Arrow to end the
+    # current episode early (skip to next, or stop after the last).
+    num_rollouts: int = 1
     interpolation_multiplier: int = 1
     device: str | None = None
     task: str = ""
@@ -208,6 +213,22 @@ class RolloutConfig:
     resume: bool = False
     # Rename map for mapping robot/dataset observation keys to policy keys
     rename_map: dict[str, str] = field(default_factory=dict)
+
+    # Hardware startup
+    # Optional. If set, smoothly interpolate the robot to these joint positions
+    # before starting the control loop. Accepts a dict like
+    # '{"j1.pos": 0.0, "j2.pos": 0.0, ...}' or a path to a JSON file
+    # containing the same dict structure.
+    # All keys must end with ".pos" to match the robot's motor names.
+    start_position: dict[str, float] | str | None = None
+    # Duration (seconds) of the interpolation to start_position.
+    start_position_duration: float = 3.0
+    # When True (default), ``start_position`` values are interpreted as raw
+    # hardware readings (e.g. xArm servo angles as displayed in Studio).  The
+    # robot's calibration is applied internally to convert them into the
+    # normalized joint space that the policy expects.  Set to False when you
+    # already have normalized / calibrated values.
+    start_position_in_raw: bool = True
 
     # Hardware teardown
     # When True (default), smoothly interpolate the robot back to the joint
