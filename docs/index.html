@@ -628,7 +628,7 @@
         <span class="pill">Final project demo · June 21, 2026</span>
         <span class="pill">Jinxi Xiao, Xuebing Li, Weile Li </span>
         <span class="pill">xArm6 + Gello + Dual RGB</span>
-        <span class="pill">Completed ACT inference on hardware</span>
+        <span class="pill">Vanilla vs. history-aware ACT · 39/40 vs 38/40</span>
       </div>
 
       <div class="hero-card">
@@ -683,8 +683,8 @@
           <span>actions predicted in each ACT action chunk during policy rollout</span>
         </div>
         <div class="stat">
-          <strong>20k</strong>
-          <span>training steps used for the ACT checkpoint schedule</span>
+          <strong>120k</strong>
+          <span>optimization steps used to train each ACT policy</span>
         </div>
       </div>
     </section>
@@ -1100,6 +1100,16 @@
             manipulation sequence, including approach, grasp, lift, transfer,
             placement, and retreat.
           </p>
+          <p>
+            Quantitatively, we evaluated a vanilla ACT baseline and a
+            history-aware variant (two observation steps) over 40 uniformly
+            sampled kettle initializations each. Both reached near-ceiling
+            success (vanilla ACT 39/40, history-aware ACT 38/40), comfortably
+            passing our 70% project threshold. The added history did not yield a
+            measurable improvement on this nearly saturated task; the single
+            vanilla-ACT failure also bent the kettle handle, which confounds the
+            comparison. The final report contains the full analysis.
+          </p>
         </div>
       </div>
 
@@ -1113,22 +1123,22 @@
         </p>
       </div>
 
-      <div class="comparison" aria-label="Completed demo criteria">
+      <div class="comparison" aria-label="Final evaluation results">
         <div class="metric">
-          <strong>End-to-end execution</strong>
-          <span>The demo covers the complete kettle-on-stove manipulation flow.</span>
+          <strong>Vanilla ACT</strong>
+          <span>39 / 40 successful trials (97.5%) over randomized kettle initializations.</span>
         </div>
         <div class="metric">
-          <strong>Real robot inference</strong>
-          <span>The trained ACT policy runs on the physical xArm6, not only offline.</span>
+          <strong>History-aware ACT (n_obs=2)</strong>
+          <span>38 / 40 successful trials (95.0%) under the identical protocol.</span>
         </div>
         <div class="metric">
-          <strong>Dual-view perception</strong>
-          <span>Arm-side and front RGB streams support object and robot observation.</span>
+          <strong>Evaluation protocol</strong>
+          <span>40 uniformly sampled kettle positions per policy on the physical xArm6.</span>
         </div>
         <div class="metric">
-          <strong>Learned action chunks</strong>
-          <span>The policy produces smooth multi-step actions instead of single commands.</span>
+          <strong>Project threshold</strong>
+          <span>Both policies clear the 70% end-to-end success bar.</span>
         </div>
       </div>
     </section>
