@@ -6,6 +6,27 @@
 
 This is a fork of [LeRobot](https://github.com/huggingface/lerobot) with added support for **Gello leader** (Dynamixel XL330 servos) teleoperating a **UFACTORY xArm6** follower.
 
+## Project Webpage
+
+A static showcase for the **2D Vision Fetching** course project lives in [`webpage/`](./webpage/). It documents the full pipeline—Gello teleoperation, dual RealSense data collection, ACT training, and real xArm6 inference—with embedded demo videos.
+
+| File | Description |
+|---|---|
+| [`webpage/index.html`](./webpage/index.html) | Project landing page (system overview, code pipeline, ACT details) |
+| [`webpage/robot_data_collection_1.mp4`](./webpage/robot_data_collection_1.mp4) | Teleoperation / data collection recording |
+| [`webpage/robot_data_collection_2.mp4`](./webpage/robot_data_collection_2.mp4) | Dual-view workspace recording |
+| [`webpage/robot_infer.mp4`](./webpage/robot_infer.mp4) | ACT policy rollout on the physical xArm6 |
+
+### Preview locally
+
+Open `webpage/index.html` in a browser (keep the video files in the same directory). For a local HTTP preview:
+
+```bash
+cd webpage
+python -m http.server 8080
+# visit http://localhost:8080
+```
+
 ## Hardware Setup
 
 | Component | Hardware | Connection |
