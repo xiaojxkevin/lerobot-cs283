@@ -6,597 +6,123 @@
   <title>2D Vision Fetching</title>
   <meta
     name="description"
-    content="A project blog for 2D Vision Fetching: real-world xArm6 tabletop manipulation from dual RGB views with Action Chunking Transformers."
+    content="2D Vision Fetching: real-world xArm6 tabletop manipulation from dual RGB views with Action Chunking Transformers."
   />
   <style>
     :root {
       --bg: #f7f4ef;
-      --paper: #fffaf2;
       --ink: #191714;
       --muted: #706b62;
       --line: #ded5c8;
       --accent: #bc5b2c;
       --accent-dark: #763614;
-      --blue: #1f4d66;
-      --green: #587d4f;
       --shadow: 0 20px 60px rgba(49, 38, 24, 0.12);
-      --radius: 28px;
-      font-family:
-        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
+      --radius: 24px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       color: var(--ink);
       background:
         radial-gradient(circle at top left, rgba(188, 91, 44, 0.13), transparent 34rem),
-        radial-gradient(circle at 90% 10%, rgba(31, 77, 102, 0.12), transparent 28rem),
         var(--bg);
       line-height: 1.65;
     }
-
-    a {
-      color: inherit;
-    }
+    a { color: var(--accent-dark); }
 
     .nav {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px min(5vw, 64px);
+      position: sticky; top: 0; z-index: 10;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px min(5vw, 64px);
       border-bottom: 1px solid rgba(222, 213, 200, 0.7);
       background: rgba(247, 244, 239, 0.86);
       backdrop-filter: blur(18px);
     }
+    .brand { font-weight: 750; letter-spacing: -0.03em; }
+    .nav-links { display: flex; gap: 22px; color: var(--muted); font-size: 0.94rem; }
+    .nav-links a { text-decoration: none; }
+    .nav-links a:hover { color: var(--ink); }
 
-    .brand {
-      font-weight: 750;
-      letter-spacing: -0.03em;
-    }
+    .wrap { width: min(960px, calc(100% - 32px)); margin: 0 auto; }
 
-    .nav-links {
-      display: flex;
-      gap: 22px;
-      color: var(--muted);
-      font-size: 0.94rem;
-    }
-
-    .nav-links a {
-      text-decoration: none;
-    }
-
-    .nav-links a:hover {
-      color: var(--ink);
-    }
-
-    .hero,
-    .section {
-      width: min(1120px, calc(100% - 32px));
-      margin: 0 auto;
-    }
-
-    .hero {
-      padding: 92px 0 54px;
-    }
-
+    .hero { padding: 76px 0 40px; }
     .eyebrow {
-      margin: 0 0 20px;
-      color: var(--accent-dark);
-      font-size: 0.82rem;
-      font-weight: 800;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
+      margin: 0 0 18px; color: var(--accent-dark);
+      font-size: 0.8rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase;
     }
-
-    h1,
-    h2,
-    h3 {
-      margin: 0;
-      line-height: 1.04;
-      letter-spacing: -0.055em;
-    }
-
-    h1 {
-      max-width: 980px;
-      font-size: clamp(2.2rem, 4.8vw, 3.4rem);
-      font-weight: 780;
-    }
-
-    h2 {
-      max-width: 860px;
-      font-size: clamp(1.65rem, 2.8vw, 2.35rem);
-      font-weight: 760;
-    }
-
-    h3 {
-      font-size: 1.4rem;
-      font-weight: 760;
-      letter-spacing: -0.035em;
-    }
-
-    .subtitle {
-      max-width: 820px;
-      margin: 28px 0 0;
-      color: #39342e;
-      font-size: clamp(1.15rem, 2vw, 1.55rem);
-      line-height: 1.5;
-    }
-
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 34px;
-      color: var(--muted);
-    }
-
+    h1, h2 { margin: 0; line-height: 1.06; letter-spacing: -0.05em; }
+    h1 { font-size: clamp(2.1rem, 4.6vw, 3.2rem); font-weight: 780; }
+    h2 { font-size: clamp(1.5rem, 2.6vw, 2.1rem); font-weight: 760; }
+    .subtitle { max-width: 760px; margin: 22px 0 0; color: #39342e; font-size: clamp(1.05rem, 1.8vw, 1.3rem); }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; color: var(--muted); }
     .pill {
-      display: inline-flex;
-      align-items: center;
-      min-height: 34px;
-      padding: 5px 12px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: rgba(255, 250, 242, 0.55);
-      font-size: 0.92rem;
+      display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px;
+      border: 1px solid var(--line); border-radius: 999px;
+      background: rgba(255, 250, 242, 0.55); font-size: 0.9rem;
     }
 
-    .hero-card {
-      margin-top: 46px;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #111;
-      box-shadow: var(--shadow);
+    .frame {
+      margin-top: 36px; overflow: hidden;
+      border: 1px solid var(--line); border-radius: var(--radius);
+      background: #111; box-shadow: var(--shadow);
     }
+    video, .frame img { display: block; width: 100%; background: #111; }
+    .caption { margin: 0; padding: 14px 18px; color: #dfd7cb; background: #15120f; font-size: 0.92rem; }
 
-    video {
-      display: block;
-      width: 100%;
-      background: #111;
-    }
-
-    .caption {
-      margin: 0;
-      padding: 16px 20px 18px;
-      color: #dfd7cb;
-      background: #15120f;
-      font-size: 0.96rem;
-    }
-
-    .section {
-      padding: 80px 0;
-      border-top: 1px solid rgba(222, 213, 200, 0.85);
-    }
-
-    .section-intro {
-      display: grid;
-      grid-template-columns: minmax(0, 0.85fr) minmax(280px, 1fr);
-      gap: clamp(28px, 6vw, 80px);
-      align-items: start;
-    }
-
-    .section-intro p,
-    .prose p {
-      margin: 0 0 20px;
-      color: #3d3832;
-      font-size: 1.08rem;
-    }
-
+    .section { padding: 64px 0; border-top: 1px solid rgba(222, 213, 200, 0.85); }
     .lede {
-      color: var(--muted);
-      font-size: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.11em;
-      font-weight: 800;
+      margin: 0 0 10px; color: var(--muted); font-size: 0.9rem;
+      text-transform: uppercase; letter-spacing: 0.11em; font-weight: 800;
     }
+    .section p { color: #3d3832; font-size: 1.05rem; }
+    .section > p { max-width: 760px; }
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 14px;
-      margin-top: 44px;
-    }
-
-    .stat,
-    .card {
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: rgba(255, 250, 242, 0.68);
-      box-shadow: 0 8px 28px rgba(49, 38, 24, 0.06);
-    }
-
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 30px; }
     .stat {
-      padding: 22px;
+      padding: 18px; border: 1px solid var(--line); border-radius: 18px;
+      background: rgba(255, 250, 242, 0.68);
     }
+    .stat strong { display: block; font-size: clamp(1.5rem, 2.6vw, 2.1rem); line-height: 1; letter-spacing: -0.05em; }
+    .stat span { display: block; margin-top: 8px; color: var(--muted); font-size: 0.85rem; }
 
-    .stat strong {
-      display: block;
-      font-size: clamp(1.8rem, 3vw, 2.8rem);
-      line-height: 1;
-      letter-spacing: -0.06em;
+    .figure { margin: 28px 0 0; }
+    .figure img {
+      display: block; width: 100%; border: 1px solid var(--line);
+      border-radius: var(--radius); background: #fff;
     }
+    .figure figcaption { margin-top: 10px; color: var(--muted); font-size: 0.92rem; }
 
-    .stat span {
-      display: block;
-      margin-top: 9px;
-      color: var(--muted);
-      font-size: 0.93rem;
-    }
+    .media-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 28px; }
+    .media-card { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: #14110f; box-shadow: var(--shadow); }
+    .media-card video { aspect-ratio: 16 / 9; object-fit: cover; }
 
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      margin-top: 36px;
-    }
+    table.results { width: 100%; margin-top: 28px; border-collapse: collapse; font-size: 1.02rem; }
+    table.results th, table.results td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+    table.results thead th { color: var(--muted); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    table.results td.num { font-variant-numeric: tabular-nums; }
 
-    .card {
-      padding: 26px;
-    }
-
-    .card p {
-      margin: 14px 0 0;
-      color: var(--muted);
-    }
-
-    .number {
-      display: inline-grid;
-      place-items: center;
-      width: 34px;
-      height: 34px;
-      margin-bottom: 18px;
-      border-radius: 50%;
-      color: #fff;
-      background: var(--ink);
-      font-size: 0.88rem;
-      font-weight: 800;
-    }
-
-    .pipeline {
-      margin-top: 42px;
-      padding: 30px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: rgba(255, 250, 242, 0.65);
-    }
-
-    .pipeline-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
-      align-items: stretch;
-    }
-
-    .node {
-      position: relative;
-      min-height: 120px;
-      padding: 18px;
-      border-radius: 20px;
-      color: #fff;
-      background: var(--blue);
-    }
-
-    .node:nth-child(2),
-    .node:nth-child(4) {
-      background: var(--accent);
-    }
-
-    .node:nth-child(3),
-    .node:nth-child(5) {
-      background: var(--green);
-    }
-
-    .node span {
-      display: block;
-      margin-bottom: 8px;
-      opacity: 0.75;
-      font-size: 0.78rem;
-      font-weight: 800;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    .node strong {
-      display: block;
-      font-size: 1.1rem;
-      line-height: 1.25;
-    }
-
-    .media-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 18px;
-      margin-top: 40px;
-    }
-
-    .media-card {
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #14110f;
-      box-shadow: var(--shadow);
-    }
-
-    .media-card video {
-      aspect-ratio: 16 / 9;
-      object-fit: cover;
-    }
-
-    .model-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-      margin-top: 38px;
-    }
-
-    .formula {
-      padding: 24px;
-      border-radius: 22px;
-      color: #f7efe4;
-      background: #191714;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-      font-size: 0.96rem;
-      line-height: 1.7;
-      overflow: auto;
-    }
+    .loss-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; }
+    .loss-grid img { width: 100%; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
 
     .quote {
-      margin: 34px 0 0;
-      padding: 30px;
-      border-left: 6px solid var(--accent);
-      border-radius: 0 24px 24px 0;
-      background: rgba(255, 250, 242, 0.7);
-      color: #332e29;
-      font-size: clamp(1.18rem, 2vw, 1.55rem);
-      line-height: 1.5;
+      margin: 30px 0 0; padding: 26px; border-left: 6px solid var(--accent);
+      border-radius: 0 22px 22px 0; background: rgba(255, 250, 242, 0.7);
+      color: #332e29; font-size: clamp(1.08rem, 1.8vw, 1.35rem); line-height: 1.5;
     }
 
-    .comparison {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
-      margin-top: 36px;
+    .footer { padding: 50px 0 80px; color: var(--muted); border-top: 1px solid rgba(222, 213, 200, 0.85); }
+    .footer a { color: var(--ink); }
+
+    @media (max-width: 820px) {
+      .nav-links { display: none; }
+      .stats, .loss-grid { grid-template-columns: 1fr 1fr; }
+      .media-grid { grid-template-columns: 1fr; }
     }
-
-    .metric {
-      padding: 20px;
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      background: rgba(255, 250, 242, 0.72);
-    }
-
-    .metric strong {
-      display: block;
-      font-size: 1.05rem;
-    }
-
-    .metric span {
-      display: block;
-      margin-top: 7px;
-      color: var(--muted);
-      font-size: 0.93rem;
-    }
-
-    .flow-section {
-      margin-top: 42px;
-    }
-
-    .flow-title {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .flow-title p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    .flow-rail {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
-    }
-
-    .flow-step {
-      position: relative;
-      min-height: 158px;
-      padding: 22px;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: rgba(255, 250, 242, 0.75);
-      box-shadow: 0 8px 28px rgba(49, 38, 24, 0.06);
-    }
-
-    .flow-step:not(:last-child)::after {
-      content: "→";
-      position: absolute;
-      top: 50%;
-      right: -14px;
-      z-index: 2;
-      display: grid;
-      place-items: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      color: #fff;
-      background: var(--accent);
-      transform: translateY(-50%);
-      font-weight: 800;
-    }
-
-    .flow-step span {
-      display: block;
-      margin-bottom: 10px;
-      color: var(--accent-dark);
-      font-size: 0.78rem;
-      font-weight: 850;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    .flow-step strong {
-      display: block;
-      font-size: 1.14rem;
-      line-height: 1.22;
-      letter-spacing: -0.035em;
-    }
-
-    .flow-step p {
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 0.94rem;
-      line-height: 1.45;
-    }
-
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 18px;
-      margin-top: 28px;
-    }
-
-    .detail-card {
-      padding: 26px;
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      background: rgba(255, 250, 242, 0.7);
-      box-shadow: 0 8px 28px rgba(49, 38, 24, 0.06);
-    }
-
-    .detail-card h3 {
-      margin-bottom: 14px;
-    }
-
-    .detail-list {
-      display: grid;
-      gap: 12px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .detail-list li {
-      padding-left: 18px;
-      border-left: 3px solid rgba(188, 91, 44, 0.42);
-      color: #4a433b;
-    }
-
-    .layer-map {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-top: 32px;
-    }
-
-    .layer {
-      display: grid;
-      grid-template-columns: 148px 1fr;
-      gap: 18px;
-      align-items: start;
-      padding: 20px;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: rgba(255, 250, 242, 0.66);
-    }
-
-    .layer-label {
-      color: var(--accent-dark);
-      font-weight: 850;
-      letter-spacing: -0.025em;
-    }
-
-    .layer p {
-      margin: 0;
-      color: var(--muted);
-    }
-
-    .footer {
-      width: min(1120px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 60px 0 80px;
-      color: var(--muted);
-      border-top: 1px solid rgba(222, 213, 200, 0.85);
-    }
-
-    .footer a {
-      color: var(--ink);
-    }
-
-    @media (max-width: 920px) {
-      .nav {
-        position: static;
-      }
-
-      .nav-links {
-        display: none;
-      }
-
-      .section-intro,
-      .model-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .stats,
-      .pipeline-grid,
-      .comparison {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .flow-rail {
-        grid-template-columns: 1fr;
-      }
-
-      .cards,
-      .media-grid,
-      .detail-grid,
-      .layer-map {
-        grid-template-columns: 1fr;
-      }
-
-      .flow-step:not(:last-child)::after {
-        top: auto;
-        right: 50%;
-        bottom: -19px;
-        transform: translateX(50%) rotate(90deg);
-      }
-
-      .layer {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 560px) {
-      .hero {
-        padding-top: 56px;
-      }
-
-      .stats,
-      .pipeline-grid,
-      .flow-rail,
-      .comparison {
-        grid-template-columns: 1fr;
-      }
-
-      .section {
-        padding: 56px 0;
-      }
+    @media (max-width: 520px) {
+      .stats, .loss-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -604,599 +130,165 @@
   <header class="nav">
     <div class="brand">2D Vision Fetching</div>
     <nav class="nav-links" aria-label="Main navigation">
-      <a href="#problem">Problem</a>
-      <a href="#system">System</a>
-      <a href="#code-pipeline">Code Pipeline</a>
+      <a href="#overview">Overview</a>
+      <a href="#method">Method</a>
       <a href="#data">Data</a>
-      <a href="#model">Model</a>
       <a href="#results">Results</a>
     </nav>
   </header>
 
   <main>
-    <section class="hero">
-      <p class="eyebrow">ShanghaiTech SIST Robotics Course Project</p>
+    <section class="hero wrap">
+      <p class="eyebrow">ShanghaiTech SIST · Robotics 2026 Course Project</p>
       <h1>Teaching an xArm6 to fetch from two RGB views</h1>
       <p class="subtitle">
-        We completed a real-robot imitation learning project for a tabletop
-        task: a Gello leader arm was used to teleoperate an xArm6 follower, two
-        RealSense RGB cameras recorded the scene, and an Action Chunking
-        Transformer was trained and deployed to pick up a toy kettle and place
-        it onto a toy stove.
+        A Gello leader teleoperates an xArm6, two RealSense cameras watch the
+        table, and an Action Chunking Transformer learns to pick up a toy kettle
+        and place it on a toy stove &mdash; from 2D vision and proprioception only.
       </p>
       <div class="meta">
-        <span class="pill">Final project demo · June 21, 2026</span>
-        <span class="pill">Jinxi Xiao, Xuebing Li, Weile Li </span>
+        <span class="pill">Xuebing Li · Weile Li · Jinxi Xiao</span>
         <span class="pill">xArm6 + Gello + Dual RGB</span>
-        <span class="pill">Completed ACT inference on hardware</span>
+        <span class="pill">ACT &middot; 39/40 success on hardware</span>
       </div>
 
-      <div class="hero-card">
-        <video controls playsinline preload="metadata" poster="">
+      <div class="frame">
+        <video controls playsinline preload="metadata">
           <source src="robot_infer.mp4" type="video/mp4" />
         </video>
         <p class="caption">
-          A trained ACT policy runs on the xArm6 and executes the kettle-on-stove
-          task from visual observations and robot proprioception.
+          The trained ACT policy autonomously performs the kettle-on-stove task
+          on the real xArm6.
         </p>
       </div>
     </section>
 
-    <section class="section" id="problem">
-      <div class="section-intro">
-        <div>
-          <p class="lede">Why this is hard</p>
-          <h2>A small tabletop task still contains the hard parts of robot manipulation.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            Pick-and-place is easy to describe but brittle on real hardware. The
-            robot must localize the kettle, align the gripper, lift without
-            slipping, transport smoothly, and release at the right place. A
-            small error during grasping can become a large error during
-            placement.
-          </p>
-          <p>
-            We deliberately use 2D RGB observations rather than depth or a full
-            3D reconstruction. This makes the setup cheaper and easier to
-            deploy, while forcing the policy to learn useful visual and temporal
-            cues from partial views, camera noise, and gripper occlusion.
-          </p>
-        </div>
-      </div>
-
-      <div class="stats" aria-label="Project snapshot">
-        <div class="stat">
-          <strong>50</strong>
-          <span>expert demonstration episodes collected for the final dataset</span>
-        </div>
-        <div class="stat">
-          <strong>2</strong>
-          <span>Intel RealSense RGB cameras observing arm-side and front views</span>
-        </div>
-        <div class="stat">
-          <strong>30Hz</strong>
-          <span>target recording frequency for synchronized robot-camera data</span>
-        </div>
-        <div class="stat">
-          <strong>100</strong>
-          <span>actions predicted in each ACT action chunk during policy rollout</span>
-        </div>
-        <div class="stat">
-          <strong>20k</strong>
-          <span>training steps used for the ACT checkpoint schedule</span>
-        </div>
+    <section class="section wrap" id="overview">
+      <p class="lede">Overview</p>
+      <h2>A small tabletop task with the hard parts of real manipulation.</h2>
+      <p>
+        We deliberately use only 2D RGB observations &mdash; no depth, no 3D
+        reconstruction &mdash; so the policy must learn grasp alignment, lifting,
+        and precise placement from partial views and gripper occlusion. We train
+        a vanilla ACT baseline and a history-aware variant that conditions on the
+        last two observation steps, and evaluate both on hardware.
+      </p>
+      <div class="stats">
+        <div class="stat"><strong>50</strong><span>teleoperated demonstration episodes</span></div>
+        <div class="stat"><strong>2</strong><span>RealSense RGB views (arm + front)</span></div>
+        <div class="stat"><strong>100</strong><span>actions per predicted chunk</span></div>
+        <div class="stat"><strong>120k</strong><span>training steps per policy</span></div>
+        <div class="stat"><strong>97.5%</strong><span>best end-to-end success rate</span></div>
       </div>
     </section>
 
-    <section class="section" id="system">
-      <div class="section-intro">
-        <div>
-          <p class="lede">How it works</p>
-          <h2>One pipeline records human skill. The other turns it into a policy.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            The data-collection loop reads the xArm state, grabs the latest RGB
-            frames from both cameras, reads the Gello leader joint positions,
-            sends the resulting command to the xArm follower, and writes the
-            synchronized observation-action frame into the LeRobot dataset.
-          </p>
-          <p>
-            Offline training loaded the recorded dataset as action chunks. The
-            ACT policy received the two-view image observation and robot
-            proprioception, then learned to predict a short horizon of
-            joint-space actions for physical rollout.
-          </p>
-        </div>
-      </div>
+    <section class="section wrap" id="method">
+      <p class="lede">Method</p>
+      <h2>One loop records human skill; ACT turns it into a policy.</h2>
+      <p>
+        A Gello leader arm drives the xArm6 follower while robot state and two
+        RGB streams are recorded at 30&nbsp;Hz into a LeRobot dataset. Offline,
+        ACT maps the two camera views and proprioception to a short chunk of
+        future joint actions, using a ResNet18 backbone, a Transformer
+        encoder&ndash;decoder, and a CVAE latent. Our history-aware variant adds a
+        spatio-temporal positional encoding so the model can attend over the
+        current and previous frame.
+      </p>
 
-      <div class="pipeline" aria-label="System pipeline">
-        <div class="pipeline-grid">
-          <div class="node">
-            <span>Human</span>
-            <strong>Gello leader arm produces teleoperation commands</strong>
-          </div>
-          <div class="node">
-            <span>Robot</span>
-            <strong>xArm6 follower executes joint and gripper targets</strong>
-          </div>
-          <div class="node">
-            <span>Vision</span>
-            <strong>Arm-side and front RGB cameras capture the workspace</strong>
-          </div>
-          <div class="node">
-            <span>Dataset</span>
-            <strong>LeRobot stores state, images, action, task, and time</strong>
-          </div>
-          <div class="node">
-            <span>Policy</span>
-            <strong>ACT executes chunked actions learned from demonstrations</strong>
-          </div>
-        </div>
-      </div>
+      <figure class="figure">
+        <img src="table.jpg" alt="Hardware setup" />
+        <figcaption>
+          Hardware: (1) Gello leader, (2) xArm6 follower, (3) gripper,
+          (4) arm-side camera, (5) front camera, (6) workspace, (7) kettle on
+          stove, (8) kettle sampling region.
+        </figcaption>
+      </figure>
+
+      <figure class="figure">
+        <img src="act_pipeline.jpg" alt="ACT policy architecture" />
+        <figcaption>
+          The ACT policy: two RGB views and robot state are encoded and fused by
+          a Transformer that predicts a 100-step action chunk.
+        </figcaption>
+      </figure>
     </section>
 
-    <section class="section" id="code-pipeline">
-      <div class="section-intro">
-        <div>
-          <p class="lede">Code project pipeline</p>
-          <h2>The codebase turns teleoperation into an autonomous robot policy.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            The implementation is built as a project-specific fork of LeRobot.
-            It adds the Gello leader interface, the xArm6 follower interface,
-            RealSense camera support, dataset recording, ACT training, and
-            policy rollout into one reproducible robot-learning stack.
-          </p>
-          <p>
-            The important design choice is separation of responsibilities:
-            hardware devices expose small interfaces, the recording loop only
-            synchronizes observation and action streams, the dataset stores a
-            fixed imitation-learning problem, and the policy layer consumes that
-            dataset without touching hardware-specific details.
-          </p>
-        </div>
-      </div>
-
-      <div class="flow-section">
-        <div class="flow-title">
-          <h3>Whole Project Flow</h3>
-          <p>From human demonstrations to real-robot inference</p>
-        </div>
-        <div class="flow-rail" aria-label="Whole code project pipeline">
-          <div class="flow-step">
-            <span>Step 1</span>
-            <strong>Teleoperate</strong>
-            <p>A human moves the Gello leader arm; seven Dynamixel readings represent six arm joints and the gripper.</p>
-          </div>
-          <div class="flow-step">
-            <span>Step 2</span>
-            <strong>Record</strong>
-            <p>The xArm6 executes the mapped command while robot state and two RGB camera streams are sampled at 30 Hz.</p>
-          </div>
-          <div class="flow-step">
-            <span>Step 3</span>
-            <strong>Build Dataset</strong>
-            <p>Each frame stores proprioception, cam-arm image, cam-front image, action, timestamp, and task label.</p>
-          </div>
-          <div class="flow-step">
-            <span>Step 4</span>
-            <strong>Train ACT</strong>
-            <p>The policy learns from 40 episodes and 14,320 frames, predicting 100-step action chunks.</p>
-          </div>
-          <div class="flow-step">
-            <span>Step 5</span>
-            <strong>Roll Out</strong>
-            <p>The trained checkpoint runs on the physical xArm6 and autonomously performs kettle placement.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="flow-section">
-        <div class="flow-title">
-          <h3>Data Collection Flow</h3>
-          <p>Human control, robot execution, visual sensing, and dataset writing happen in one loop.</p>
-        </div>
-        <div class="flow-rail" aria-label="Data collection pipeline">
-          <div class="flow-step">
-            <span>Input</span>
-            <strong>Gello Leader</strong>
-            <p>Reads normalized joint positions from the passive leader arm through the Dynamixel bus.</p>
-          </div>
-          <div class="flow-step">
-            <span>Control</span>
-            <strong>xArm6 Follower</strong>
-            <p>Receives joint and gripper targets through the xArm SDK and executes them without waiting for full trajectory completion.</p>
-          </div>
-          <div class="flow-step">
-            <span>Sensing</span>
-            <strong>Dual RealSense</strong>
-            <p>Captures arm-side and front RGB views by stable serial-number identification, avoiding camera-index ambiguity.</p>
-          </div>
-          <div class="flow-step">
-            <span>Sync</span>
-            <strong>30 Hz Frame</strong>
-            <p>Combines calibrated robot state, latest images, action, and task string into one aligned demonstration frame.</p>
-          </div>
-          <div class="flow-step">
-            <span>Storage</span>
-            <strong>LeRobot Dataset</strong>
-            <p>Stores numeric fields as structured episode data and encodes camera streams as videos for efficient replay.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="flow-section">
-        <div class="flow-title">
-          <h3>Training Flow</h3>
-          <p>The recorded dataset becomes supervised action-chunk targets.</p>
-        </div>
-        <div class="flow-rail" aria-label="ACT training pipeline">
-          <div class="flow-step">
-            <span>Dataset</span>
-            <strong>Episode-Aware Loading</strong>
-            <p>Samples stay inside episode boundaries so action chunks do not cross resets or task endings.</p>
-          </div>
-          <div class="flow-step">
-            <span>Observation</span>
-            <strong>Image + State Tokens</strong>
-            <p>Two RGB views are resized for the visual backbone and paired with the seven-dimensional robot state.</p>
-          </div>
-          <div class="flow-step">
-            <span>Encoder</span>
-            <strong>ResNet + Transformer</strong>
-            <p>Visual features, proprioception, and latent information are fused into a shared representation.</p>
-          </div>
-          <div class="flow-step">
-            <span>Supervision</span>
-            <strong>Chunk Loss</strong>
-            <p>The model reconstructs 100-step action sequences with an L1 term and VAE regularization.</p>
-          </div>
-          <div class="flow-step">
-            <span>Output</span>
-            <strong>Deployable Checkpoint</strong>
-            <p>Saved policy weights, configuration, processor settings, and normalization statistics are used for rollout.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="flow-section">
-        <div class="flow-title">
-          <h3>Inference Flow</h3>
-          <p>The deployment loop mirrors recording, but actions come from the trained policy.</p>
-        </div>
-        <div class="flow-rail" aria-label="Policy rollout pipeline">
-          <div class="flow-step">
-            <span>Observe</span>
-            <strong>Online Robot State</strong>
-            <p>The xArm wrapper gathers calibrated joint state, gripper state, cam-arm RGB, and cam-front RGB.</p>
-          </div>
-          <div class="flow-step">
-            <span>Prepare</span>
-            <strong>Normalize Inputs</strong>
-            <p>Preprocessors convert live observations into the same feature space used during training.</p>
-          </div>
-          <div class="flow-step">
-            <span>Predict</span>
-            <strong>ACT Action Chunk</strong>
-            <p>The policy predicts a queue of future robot actions instead of making an isolated one-step decision.</p>
-          </div>
-          <div class="flow-step">
-            <span>Schedule</span>
-            <strong>Chunk Execution</strong>
-            <p>An action interpolator and queue select the next command while preserving the target control rate.</p>
-          </div>
-          <div class="flow-step">
-            <span>Act</span>
-            <strong>xArm6 Motion</strong>
-            <p>The robot executes joint and gripper targets, producing the autonomous pick-and-place demonstration.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="layer-map" aria-label="Software architecture layers">
-        <div class="layer">
-          <div class="layer-label">Hardware Layer</div>
-          <p>Gello leader, xArm6 follower, gripper, and two RealSense cameras expose device-specific connect, observe, and act behavior.</p>
-        </div>
-        <div class="layer">
-          <div class="layer-label">Calibration Layer</div>
-          <p>Gello raw encoder readings are normalized into degrees, while xArm calibration maps between normalized commands and physical joint or gripper units.</p>
-        </div>
-        <div class="layer">
-          <div class="layer-label">Processor Layer</div>
-          <p>Observation and action processors keep the interface modular; in this project the mapping is mostly identity after calibration.</p>
-        </div>
-        <div class="layer">
-          <div class="layer-label">Dataset Layer</div>
-          <p>LeRobotDataset stores synchronized observation-action-task frames and preserves camera videos for later training, replay, and visualization.</p>
-        </div>
-        <div class="layer">
-          <div class="layer-label">Policy Layer</div>
-          <p>ACT uses a ResNet18 visual backbone, Transformer encoder-decoder, VAE latent variable, and 100-step action chunk output.</p>
-        </div>
-        <div class="layer">
-          <div class="layer-label">Rollout Layer</div>
-          <p>The deployment strategy repeatedly observes, preprocesses, predicts, schedules, and sends actions until the task is complete.</p>
-        </div>
-      </div>
-
-      <div class="detail-grid">
-        <div class="detail-card">
-          <h3>What the dataset contains</h3>
-          <ul class="detail-list">
-            <li>Seven-dimensional robot state: six xArm joints plus gripper position.</li>
-            <li>Two synchronized RGB observations: an arm-side camera and a front scene camera.</li>
-            <li>Seven-dimensional action targets produced by the Gello leader and executed by the xArm follower.</li>
-            <li>A natural-language task label, “put kettle on stove,” stored with every demonstration frame.</li>
-            <li>Episode-level organization that supports replay, visualization, training, and closed-loop debugging.</li>
-          </ul>
-        </div>
-        <div class="detail-card">
-          <h3>Why the implementation is robust enough for hardware</h3>
-          <ul class="detail-list">
-            <li>Camera devices are selected by RealSense serial number, so cam-arm and cam-front do not swap accidentally.</li>
-            <li>Background camera reading keeps the control loop close to 30 Hz instead of blocking on slow image capture.</li>
-            <li>xArm safety limits can cap relative target motion, reducing the risk of sudden large commands.</li>
-            <li>Streaming video encoding prevents episode saving from becoming the slowest part of data collection.</li>
-            <li>Rollout uses the same observation schema as recording, which reduces train-deploy mismatch.</li>
-          </ul>
-        </div>
-        <div class="detail-card">
-          <h3>ACT-specific details</h3>
-          <ul class="detail-list">
-            <li>The default model uses a ResNet18 image backbone with ImageNet initialization.</li>
-            <li>Multiple camera views are treated as separate visual streams before being fused by the Transformer.</li>
-            <li>The model predicts a 100-step action chunk, matching the temporal abstraction used in ACT.</li>
-            <li>The VAE encoder is used during training to model demonstration action sequences; inference uses the policy decoder.</li>
-            <li>History-frame support allows the model to receive the current frame plus recent observations when the history window is enabled.</li>
-          </ul>
-        </div>
-        <div class="detail-card">
-          <h3>Engineering lessons from the completed project</h3>
-          <ul class="detail-list">
-            <li>The most important integration point is consistent calibration between Gello degrees and xArm physical joint units.</li>
-            <li>Dataset quality depends on synchronized sensing, not only on whether the robot visibly completes the task.</li>
-            <li>Joint-space control is a practical choice for this setup because it maps cleanly to the xArm follower interface.</li>
-            <li>The code structure keeps data collection, training, and deployment separable, making failures easier to diagnose.</li>
-            <li>The final inference video demonstrates the whole pipeline rather than a single isolated model component.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="data">
-      <div class="section-intro">
-        <div>
-          <p class="lede">Robot data</p>
-          <h2>We collected demonstrations directly on the physical setup.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            The videos below show the human-in-the-loop data collection process.
-            The Gello leader provides an intuitive control interface, while the
-            follower robot, camera streams, and dataset writer run in one
-            synchronized loop.
-          </p>
-          <p>
-            This matters because imitation learning is only as good as the
-            demonstrations it receives. For a precise kettle placement task, the
-            dataset must capture not only the successful final pose but also the
-            approach, grasp, lift, transfer, release, and retreat phases.
-          </p>
-        </div>
-      </div>
-
+    <section class="section wrap" id="data">
+      <p class="lede">Data collection</p>
+      <h2>Demonstrations recorded directly on the physical setup.</h2>
+      <p>
+        The Gello leader gives an intuitive control interface; follower, cameras,
+        and dataset writer run in one synchronized loop, capturing the full
+        approach &rarr; grasp &rarr; lift &rarr; transfer &rarr; place &rarr; retreat motion.
+      </p>
       <div class="media-grid">
         <article class="media-card">
           <video controls playsinline preload="metadata">
             <source src="robot_data_collection_1.mp4" type="video/mp4" />
           </video>
-          <p class="caption">
-            Data collection view 1: teleoperated demonstrations for the
-            kettle-on-stove task.
-          </p>
+          <p class="caption">Teleoperated demonstration of the kettle-on-stove task.</p>
         </article>
         <article class="media-card">
           <video controls playsinline preload="metadata">
             <source src="robot_data_collection_2.mp4" type="video/mp4" />
           </video>
-          <p class="caption">
-            Data collection view 2: synchronized visual observations from the
-            real tabletop workspace.
-          </p>
+          <p class="caption">Synchronized dual-view capture of the tabletop workspace.</p>
         </article>
       </div>
     </section>
 
-    <section class="section" id="model">
-      <div class="section-intro">
-        <div>
-          <p class="lede">ACT policy</p>
-          <h2>Instead of predicting one action, the model predicts a short trajectory.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            Action Chunking Transformers reduce the short-sightedness of
-            step-by-step behavioral cloning. At every policy query, the network
-            predicts a sequence of actions, and temporal ensembling can
-            blend overlapping predictions into smoother execution.
-          </p>
-          <p>
-            In our implementation, the observation includes two RGB images and
-            the xArm proprioceptive state. The action target is a chunk of robot
-            commands. During training, the CVAE encoder models the demonstration
-            action sequence through a latent style variable. At deployment time,
-            the decoder acts as the policy.
-          </p>
-        </div>
-      </div>
+    <section class="section wrap" id="results">
+      <p class="lede">Results</p>
+      <h2>Both policies reach near-ceiling success on hardware.</h2>
+      <p>
+        Each policy was evaluated over 40 trials with the kettle uniformly
+        sampled across the workspace. A trial counts as a success only if it is
+        collision-free, places the kettle within &plusmn;3&nbsp;cm and upright, and
+        the arm returns home &mdash; all within 90&nbsp;s.
+      </p>
 
-      <div class="model-grid">
-        <div class="card">
-          <span class="number">1</span>
-          <h3>Chunked action prediction</h3>
-          <p>
-            The policy learns a 100-step action block, making the unit of
-            imitation closer to a meaningful motion segment than a single servo
-            command.
-          </p>
-        </div>
-        <div class="card">
-          <span class="number">2</span>
-          <h3>Two-view visual grounding</h3>
-          <p>
-            Arm-side and front cameras provide complementary information about
-            the gripper, object, target stove, and workspace geometry.
-          </p>
-        </div>
-      </div>
+      <figure class="figure">
+        <img src="rollout.jpg" alt="Policy rollout filmstrip" />
+        <figcaption>
+          A successful rollout (left&rarr;right): approach, grasp and lift,
+          transport, and upright placement on the stove.
+        </figcaption>
+      </figure>
 
-      <div class="comparison" aria-label="ACT objective summary">
-        <div class="metric">
-          <strong>Observation</strong>
-          <span>Two RGB camera views plus xArm joint and gripper state.</span>
-        </div>
-        <div class="metric">
-          <strong>Target</strong>
-          <span>A 100-step sequence of future robot actions from the demonstration.</span>
-        </div>
-        <div class="metric">
-          <strong>Architecture</strong>
-          <span>ResNet visual features, Transformer attention, and a CVAE latent variable.</span>
-        </div>
-        <div class="metric">
-          <strong>Training Signal</strong>
-          <span>Action reconstruction quality balanced with latent-space regularization.</span>
-        </div>
+      <table class="results">
+        <thead>
+          <tr><th>Policy</th><th>Successful trials</th><th>Success rate</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Vanilla ACT</td><td class="num">39 / 40</td><td class="num">97.5%</td></tr>
+          <tr><td>History-aware ACT (n_obs = 2)</td><td class="num">38 / 40</td><td class="num">95.0%</td></tr>
+        </tbody>
+      </table>
+
+      <div class="loss-grid" aria-label="Training curves">
+        <img src="loss-all.png" alt="Total training loss" />
+        <img src="LOSS-L1.png" alt="L1 reconstruction loss" />
+        <img src="LOSS-KL.png" alt="KL divergence loss" />
       </div>
 
       <p class="quote">
-        The completed demo validates the core design choice: temporal structure
-        matters. Grasp alignment, object lifting, and final placement depend on
-        a coherent motion segment, not only on a single instantaneous command.
+        The added history did not measurably improve this near-saturated task &mdash;
+        and the single baseline failure bent the kettle handle, confounding the
+        comparison. The full analysis is in our final report.
       </p>
-    </section>
-
-    <section class="section" id="results">
-      <div class="section-intro">
-        <div>
-          <p class="lede">Training and inference</p>
-          <h2>From demonstrations to a closed-loop robot policy.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            We completed the core teleoperation-to-dataset-to-policy loop:
-            hardware setup, dual-view recording, offline ACT training, and
-            physical inference on the xArm6. The final demo shows that a policy
-            trained from our collected data can produce coherent pick-and-place
-            behavior on the real robot.
-          </p>
-          <p>
-            The inference video is the central project outcome: the robot uses
-            dual-view RGB observations and proprioception to execute the learned
-            manipulation sequence, including approach, grasp, lift, transfer,
-            placement, and retreat.
-          </p>
-        </div>
-      </div>
-
-      <!-- <div class="hero-card">
-        <video controls playsinline preload="metadata">
-          <source src="robot_infer.mp4" type="video/mp4" />
-        </video>
-        <p class="caption">
-          ACT inference on hardware: the learned policy generates action chunks
-          for real xArm6 execution.
-        </p>
-      </div> -->
-
-      <div class="comparison" aria-label="Completed demo criteria">
-        <div class="metric">
-          <strong>End-to-end execution</strong>
-          <span>The demo covers the complete kettle-on-stove manipulation flow.</span>
-        </div>
-        <div class="metric">
-          <strong>Real robot inference</strong>
-          <span>The trained ACT policy runs on the physical xArm6, not only offline.</span>
-        </div>
-        <div class="metric">
-          <strong>Dual-view perception</strong>
-          <span>Arm-side and front RGB streams support object and robot observation.</span>
-        </div>
-        <div class="metric">
-          <strong>Learned action chunks</strong>
-          <span>The policy produces smooth multi-step actions instead of single commands.</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-intro">
-        <div>
-          <p class="lede">What we learned</p>
-          <h2>A compact real-robot setup was enough to complete the full learning loop.</h2>
-        </div>
-        <div class="prose">
-          <p>
-            The project started from a focused manipulation problem and ended as
-            a complete real-hardware demonstration. Along the way, the system
-            forced us to solve the same practical issues that appear in larger
-            robot-learning pipelines: hardware synchronization, camera
-            calibration, action representation, dataset quality, and temporal
-            consistency.
-          </p>
-          <p>
-            The technical principles from the report explain why the demo works:
-            ACT converts teleoperated behavior into action chunks, the dual RGB
-            cameras provide complementary visual grounding, and the LeRobot
-            dataset format keeps observations, actions, and task labels aligned
-            for supervised imitation learning.
-          </p>
-        </div>
-      </div>
-
-      <div class="cards">
-        <div class="card">
-          <h3>Two-view perception</h3>
-          <p>
-            The arm-side camera captures gripper-object interaction, while the
-            front camera gives a wider scene-level view of the kettle and stove.
-          </p>
-        </div>
-        <div class="card">
-          <h3>Stable joint-space control</h3>
-          <p>
-            Joint-space commands match the xArm follower interface and avoid
-            adding an extra inverse-kinematics layer inside the learned policy.
-          </p>
-        </div>
-        <div class="card">
-          <h3>Hardware-first validation</h3>
-          <p>
-            The final deliverable is not only a training pipeline, but a visible
-            inference video showing the learned policy acting on the real robot.
-          </p>
-        </div>
-      </div>
     </section>
   </main>
 
-  <footer class="footer">
+  <footer class="footer wrap">
     <p>
-      2D Vision Fetching is a course project by Xuebing Li, Weile Li, and Jinxi
-      Xiao. The page format is inspired by the long-form robotics technical
-      storytelling style of Physical Intelligence's
-      <a href="http://pi.website/blog/pi05">pi0.5 blog post</a>, adapted here
-      for a smaller real-robot imitation learning project.
+      2D Vision Fetching &mdash; a Robotics 2026 course project by Xuebing Li,
+      Weile Li, and Jinxi Xiao. Page style inspired by long-form robotics project
+      pages such as Physical Intelligence's
+      <a href="http://pi.website/blog/pi05">&pi;0.5 post</a>.
     </p>
     <p>
-      Course repository:
-      <a href="https://github.com/xiaojxkevin/lerobot-cs283.git">
-        github.com/xiaojxkevin/lerobot-cs283
-      </a>
+      Code:
+      <a href="https://github.com/xiaojxkevin/lerobot-cs283.git">github.com/xiaojxkevin/lerobot-cs283</a>
     </p>
   </footer>
 </body>
